@@ -13,9 +13,9 @@ Este repositorio contiene el proyecto final del curso **CS2023 - Algoritmos y Es
 * **Semestre:** 2026-I
 
 ### Integrantes del Equipo
-1. **Estrada Fiestas, Christian Estrada** - *Desarrollador Algorítmico / Arquitecto Core* (GitHub: [Chrissrtx](https://github.com/Chrissrtx))
-2. **Alvarado León, Adriana Celeste** - *Especialista en Datos y Métricas / Gestor de Datos y KNN*
-3. **Jesus Herrera, Mark Antony** - *Diseñador de GUI e Interacción / Desarrollador Visual*
+1. **Alvarado León, Adriana Celeste** - *Desarrollador Algorítmico / Arquitecto Core*
+2. **Kurth Dávila** - *Especialista en Datos y Métricas / Gestor de Datos y KNN*
+3. **Estrada Fiestas, Christian Estrada** - *Diseñador de GUI e Interacción / Desarrollador Visual* (GitHub: [Chrissrtx](https://github.com/Chrissrtx))
 
 ---
 
