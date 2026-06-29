@@ -68,7 +68,7 @@ void runExperiments(DatasetManager& manager, int dataSize) {
 
 int main() {
     DatasetManager manager;
-    std::string datasetPath = "cities15000.txt"; 
+    std::string datasetPath = "src/gestor_datos/cities15000.txt"; 
 
     std::vector<int> testSizes = {1000, 5000, 15000};
 
