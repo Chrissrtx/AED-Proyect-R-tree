@@ -44,7 +44,7 @@ Es el punto de entrada exclusivo para la experimentación y medición de tiempos
 Para compilar y ejecutar las pruebas de rendimiento (métricas) desde la terminal, ubícate en la raíz del proyecto y ejecuta el siguiente comando:
 
 ```bash
-g++ -std=c++17 data_metrics/main_metrics.cpp data_metrics/dataset_manager.cpp -o metricas_test
+g++ -std=c++17 src/gestor_datos/main_metrics.cpp src/gestor_datos/dataset_manager.cpp -o metricas_test
 ```
 
 Una vez compilado sin errores, ejecuta el programa según tu sistema operativo.
