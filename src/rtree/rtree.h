@@ -317,6 +317,55 @@ private:
     }
 
 public:
+    struct VisitedNodeInfo {
+        MBR mbr;
+        int depth;
+        bool isLeaf;
+        bool intersected;
+    };
+
+    struct RTreeStructureNode {
+        MBR mbr;
+        int depth;
+        bool isLeaf;
+    };
+
+private:
+    void rangeQueryVisitedHelper(RTreeNode* node, const MBR& queryBox, int depth, std::vector<SpatialObject>& results, std::vector<VisitedNodeInfo>& visited) const {
+        if (node == nullptr) return;
+
+        bool intersects = node->mbr.intersects(queryBox);
+        visited.push_back({node->mbr, depth, node->isLeaf, intersects});
+
+        if (!intersects) {
+            return;
+        }
+
+        if (node->isLeaf) {
+            for (const auto& obj : node->objects) {
+                if (obj.x >= queryBox.x_min && obj.x <= queryBox.x_max &&
+                    obj.y >= queryBox.y_min && obj.y <= queryBox.y_max) {
+                    results.push_back(obj);
+                }
+            }
+        } else {
+            for (RTreeNode* child : node->children) {
+                rangeQueryVisitedHelper(child, queryBox, depth + 1, results, visited);
+            }
+        }
+    }
+
+    void getStructureHelper(RTreeNode* node, int depth, std::vector<RTreeStructureNode>& structure) const {
+        if (node == nullptr) return;
+        structure.push_back({node->mbr, depth, node->isLeaf});
+        if (!node->isLeaf) {
+            for (RTreeNode* child : node->children) {
+                getStructureHelper(child, depth + 1, structure);
+            }
+        }
+    }
+
+public:
     void insert(const SpatialObject& obj) {
         if (root == nullptr) {
             root = new RTreeNode(true); 
@@ -336,6 +385,18 @@ public:
         std::vector<SpatialObject> results;
         rangeQueryHelper(root, queryBox, results);
         return results;
+    }
+
+    std::vector<SpatialObject> rangeQueryWithVisited(const MBR& queryBox, std::vector<VisitedNodeInfo>& visited) const {
+        std::vector<SpatialObject> results;
+        rangeQueryVisitedHelper(root, queryBox, 0, results, visited);
+        return results;
+    }
+
+    std::vector<RTreeStructureNode> getStructure() const {
+        std::vector<RTreeStructureNode> structure;
+        getStructureHelper(root, 0, structure);
+        return structure;
     }
 
     RTreeNode* getRoot() const {
