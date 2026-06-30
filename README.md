@@ -1,7 +1,4 @@
 # AED Proyecto R-Tree: Buscador Espacial Interactivo
-
-Este repositorio contiene la entrega final del proyecto para el curso **CS2023 - Algoritmos y Estructuras de Datos**. Consiste en la investigación, implementación desde cero y evaluación comparativa de un **R-Tree (Árbol R)**. El proyecto cuenta con una aplicación gráfica interactiva que permite realizar consultas espaciales en tiempo real (por rango rectangular y por $k$ vecinos más cercanos) y medir su desempeño frente a una solución lineal básica.
-
 ---
 
 ## 1. Información del Curso e Integrantes
