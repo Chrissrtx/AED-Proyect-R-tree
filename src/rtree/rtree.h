@@ -2,14 +2,16 @@
 #include "node.h"
 #include <vector>
 #include <limits>
+#include <cmath>
+#include <queue>
+#include <functional>
 
 
 class RTree {
 private:
     RTreeNode* root;
 
-    // --- Helpers para la Búsqueda KNN ---
-
+    //Helpers para la Búsqueda KNN
     // 1. Calcular distancia mínima de un punto a un MBR (Rectángulo)
     double distanceToMBR(double x, double y, const MBR& mbr) const {
         double closestX = std::max(mbr.x_min, std::min(x, mbr.x_max));
@@ -262,6 +264,58 @@ private:
         }
     }
 
+    // Auxiliar recursivo para recolectar todos los objetos de un subárbol
+    void collectAllObjects(RTreeNode* node, std::vector<SpatialObject>& objects) {
+        if (node->isLeaf) {
+            for (const auto& obj : node->objects) {
+                objects.push_back(obj);
+            }
+        } else {
+            for (RTreeNode* child : node->children) {
+                if (child) {
+                    collectAllObjects(child, objects);
+                }
+            }
+        }
+    }
+
+    // Auxiliar recursivo para la eliminación y condensación del árbol
+    bool removeHelper(RTreeNode* node, int id, bool& found, std::vector<SpatialObject>& orphanObjects) {
+        if (node->isLeaf) {
+            for (auto it = node->objects.begin(); it != node->objects.end(); ++it) {
+                if (it->id == id) {
+                    node->objects.erase(it);
+                    node->recalculateMBR();
+                    found = true;
+                    // Si es la raíz, no se exige el mínimo de entradas
+                    return (node != root && node->objects.size() < RTreeNode::MIN_ENTRIES);
+                }
+            }
+            return false;
+        }
+
+        for (auto it = node->children.begin(); it != node->children.end(); ++it) {
+            RTreeNode* child = *it;
+            bool childNeedsRemoval = removeHelper(child, id, found, orphanObjects);
+
+            if (found) {
+                if (childNeedsRemoval) {
+                    // El hijo quedó por debajo de MIN_ENTRIES, lo removemos y recolectamos sus objetos
+                    node->children.erase(it);
+                    collectAllObjects(child, orphanObjects);
+                    delete child; // Destrucción recursiva segura
+
+                    node->recalculateMBR();
+                    return (node != root && node->children.size() < RTreeNode::MIN_ENTRIES);
+                } else {
+                    node->recalculateMBR();
+                    return (node != root && node->children.size() < RTreeNode::MIN_ENTRIES);
+                }
+            }
+        }
+        return false;
+    }
+
 public:
     void insert(const SpatialObject& obj) {
         if (root == nullptr) {
@@ -332,7 +386,41 @@ public:
 
     //Eliminar un objeto por su identificador
     bool remove(int id) {
-        //PENDIENTE: Implementar eliminación y reajuste/condensación del árbol
-        return false;
+        if (root == nullptr) return false;
+
+        bool found = false;
+        std::vector<SpatialObject> orphanObjects;
+
+        // Llamar al ayudante recursivo
+        bool rootNeedsRemoval = removeHelper(root, id, found, orphanObjects);
+
+        if (!found) {
+            return false;
+        }
+
+        // Si la raíz quedó vacía tras la eliminación y es hoja
+        if (root->isLeaf && root->objects.empty()) {
+            delete root;
+            root = nullptr;
+        }
+        // Si la raíz quedó por debajo del mínimo (para la raíz, solo importa si es interna y tiene un solo hijo)
+        else if (!root->isLeaf && root->children.size() < 2) {
+            if (root->children.size() == 1) {
+                RTreeNode* oldRoot = root;
+                root = root->children[0];
+                oldRoot->children.clear(); // Evitar que el destructor borre al nuevo root
+                delete oldRoot;
+            } else if (root->children.empty()) {
+                delete root;
+                root = nullptr;
+            }
+        }
+
+        // Reinsertar todos los objetos huérfanos
+        for (const auto& obj : orphanObjects) {
+            insert(obj);
+        }
+
+        return true;
     }
 };

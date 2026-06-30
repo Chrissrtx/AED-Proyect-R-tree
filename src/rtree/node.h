@@ -10,8 +10,8 @@ public:
     std::vector<SpatialObject> objects; //Datos si es hoja
     std::vector<RTreeNode*> children;   //Hijos si es nodo interno 
 
-    static const size_t MAX_ENTRIES = 4;
-    static const size_t MIN_ENTRIES = 2;
+    static const size_t MAX_ENTRIES = 32;
+    static const size_t MIN_ENTRIES = 16;
 
     RTreeNode(bool leaf) : isLeaf(leaf) {}
 
