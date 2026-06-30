@@ -8,6 +8,40 @@ class RTree {
 private:
     RTreeNode* root;
 
+    // --- Helpers para la Búsqueda KNN ---
+
+    // 1. Calcular distancia mínima de un punto a un MBR (Rectángulo)
+    double distanceToMBR(double x, double y, const MBR& mbr) const {
+        double closestX = std::max(mbr.x_min, std::min(x, mbr.x_max));
+        double closestY = std::max(mbr.y_min, std::min(y, mbr.y_max));
+        
+        double dx = x - closestX;
+        double dy = y - closestY;
+        return std::sqrt(dx * dx + dy * dy);
+    }
+
+    // 2. Calcular distancia exacta de un punto a un Objeto Espacial
+    double distanceToObject(double x, double y, const SpatialObject& obj) const {
+        double dx = x - obj.x;
+        double dy = y - obj.y;
+        return std::sqrt(dx * dx + dy * dy);
+    }
+
+    // 3. Estructura envolvente para la cola de prioridad
+    struct KNNItem {
+        double distance;
+        bool isNode;           // true si es un RTreeNode, false si es un SpatialObject
+        RTreeNode* node;       // Puntero al nodo (si isNode == true)
+        SpatialObject obj;     // Datos del objeto (si isNode == false)
+
+        // Sobrecarga para Min-Heap (el menor valor de distancia tiene mayor prioridad)
+        bool operator>(const KNNItem& other) const {
+            return distance > other.distance;
+        }
+    };
+
+
+
 public:
     RTree() : root(nullptr) {}
 
@@ -257,7 +291,42 @@ public:
     //Consultar los k vecinos más cercanos (k-NN Query)
     std::vector<SpatialObject> knnQuery(double x, double y, int k) const {
         std::vector<SpatialObject> results;
-        //PENDIENTE: Implementar búsqueda de vecinos usando una cola de prioridad
+        if (root == nullptr || k <= 0) return results;
+
+        // Cola de prioridad Min-Heap (extrae el elemento con la distancia mínima)
+        std::priority_queue<KNNItem, std::vector<KNNItem>, std::greater<KNNItem>> pq;
+
+        // Insertar la raíz del árbol en la cola
+        pq.push({distanceToMBR(x, y, root->mbr), true, root, SpatialObject()});
+
+        while (!pq.empty() && results.size() < static_cast<size_t>(k)) {
+            KNNItem current = pq.top();
+            pq.pop();
+
+            if (current.isNode) {
+                RTreeNode* node = current.node;
+                
+                if (node->isLeaf) {
+                    // Si llegamos a una hoja, calculamos distancias reales a los objetos
+                    for (const auto& obj : node->objects) {
+                        double dist = distanceToObject(x, y, obj);
+                        pq.push({dist, false, nullptr, obj});
+                    }
+                } else {
+                    // Si es un nodo interno, metemos los MBR de sus hijos a la cola
+                    for (RTreeNode* child : node->children) {
+                        if (child != nullptr) {
+                            double dist = distanceToMBR(x, y, child->mbr);
+                            pq.push({dist, true, child, SpatialObject()});
+                        }
+                    }
+                }
+            } else {
+                // Si el elemento extraído NO es un nodo, es el objeto espacial.
+                results.push_back(current.obj);
+            }
+        }
+
         return results;
     }
 

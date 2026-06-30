@@ -3,7 +3,6 @@
 #include <vector>
 #include <iomanip>
 
-
 #include "dataset_manager.h"          
 #include "../rtree/rtree.h"    
 #include "../rtree/mbr.h"       
@@ -15,62 +14,92 @@ void runExperiments(DatasetManager& manager, int dataSize) {
 
     // 1. --- TIEMPO DE CONSTRUCCIÓN DEL R-TREE ---
     RTree rtree;
-    auto start_build = std::chrono::high_resolution_clock::now();
-    
-    // Inyectamos todos los datos leídos por tu parser al árbol usando su método insert 
     for (const auto& obj : manager.getDataset()) {
         rtree.insert(obj);
     }
-    
-    auto end_build = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> duration_build = end_build - start_build;
-    std::cout << "[R-Tree] Tiempo de construccion: " << duration_build.count() << " ms\n\n";
 
     // --- COORDENADAS DE PRUEBA ---
     double minX = 1.0, minY = 40.0, maxX = 2.0, maxY = 43.0;
-
-    // 2. --- CONSULTA: BÚSQUEDA LINEAL (Tu código) ---
-    auto start_range = std::chrono::high_resolution_clock::now();
-    auto range_results = manager.linearRangeSearch(minX, minY, maxX, maxY);
-    auto end_range = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> duration_range = end_range - start_range;
-
-    std::cout << "[Busqueda Lineal] Encontrados: " << range_results.size() << "\n";
-    std::cout << "[Busqueda Lineal] Tiempo:      " << duration_range.count() << " ms\n";
-
-    // 3. --- CONSULTA: R-TREE ---
-    MBR queryBox(minX, minY, maxX, maxY); 
-    
-    auto start_rtree = std::chrono::high_resolution_clock::now();
-    auto rtree_results = rtree.rangeQuery(queryBox);
-    auto end_rtree = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> duration_rtree = end_rtree - start_rtree;
-
-    std::cout << "[R-Tree]          Encontrados: " << rtree_results.size() << "\n";
-    std::cout << "[R-Tree]          Tiempo:      " << duration_rtree.count() << " ms\n\n";
-
-    // 4. --- PRUEBA DE KNN ---
     double queryX = 1.5, queryY = 42.5;
     int k = 5;
-
-    auto start_knn = std::chrono::high_resolution_clock::now();
-    auto knn_results = manager.knnSearch(queryX, queryY, k);
-    auto end_knn = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> duration_knn = end_knn - start_knn;
-
-    std::cout << "[KNN (" << k << " vecinos)] Tiempo global: " << duration_knn.count() << " ms\n";
-    std::cout << "Top 1 encontrado: " << (knn_results.empty() ? "N/A" : knn_results[0].name) << "\n";
     
-    // Cálculo rápido de cuánto más veloz es el árbol frente a la solución ingenua
-    double speedup = duration_range.count() / (duration_rtree.count() > 0 ? duration_rtree.count() : 0.001);
-    std::cout << "\n>>> RENDIMIENTO: El R-Tree fue " << std::fixed << std::setprecision(2) << speedup << "x veces mas rapido en la consulta por rango. <<<\n";
-}
+    // VARIABLES PARA EL BENCHMARK
+    int iteraciones = 100; // Ejecutaremos todo 100 veces
+    size_t dummy_sum = 0;  // Para evitar que el compilador ignore el bucle
 
+    // 2. --- CONSULTA: BÚSQUEDA LINEAL POR RANGO ---
+    auto start_range = std::chrono::high_resolution_clock::now();
+    size_t range_found = 0;
+    for(int i = 0; i < iteraciones; i++) {
+        auto res = manager.linearRangeSearch(minX, minY, maxX, maxY);
+        range_found = res.size();
+        dummy_sum += range_found; 
+    }
+    auto end_range = std::chrono::high_resolution_clock::now();
+    double avg_range_linear = std::chrono::duration<double, std::milli>(end_range - start_range).count() / iteraciones;
+
+    std::cout << "[Rango Lineal]    Encontrados: " << range_found << "\n";
+    std::cout << "[Rango Lineal]    Tiempo prom: " << avg_range_linear << " ms\n";
+
+    // 3. --- CONSULTA: R-TREE POR RANGO ---
+    MBR queryBox(minX, minY, maxX, maxY); 
+    auto start_rtree = std::chrono::high_resolution_clock::now();
+    size_t rtree_found = 0;
+    for(int i = 0; i < iteraciones; i++) {
+        auto res = rtree.rangeQuery(queryBox);
+        rtree_found = res.size();
+        dummy_sum += rtree_found;
+    }
+    auto end_rtree = std::chrono::high_resolution_clock::now();
+    double avg_range_rtree = std::chrono::duration<double, std::milli>(end_rtree - start_rtree).count() / iteraciones;
+
+    std::cout << "[Rango R-Tree]    Encontrados: " << rtree_found << "\n";
+    std::cout << "[Rango R-Tree]    Tiempo prom: " << avg_range_rtree << " ms\n\n";
+
+    // 4. --- PRUEBA DE KNN (BÚSQUEDA LINEAL) ---
+    auto start_knn_linear = std::chrono::high_resolution_clock::now();
+    std::string top1_linear = "";
+    for(int i = 0; i < iteraciones; i++) {
+        auto res = manager.knnSearch(queryX, queryY, k);
+        if(i == 0 && !res.empty()) top1_linear = res[0].name;
+        dummy_sum += res.size();
+    }
+    auto end_knn_linear = std::chrono::high_resolution_clock::now();
+    double avg_knn_linear = std::chrono::duration<double, std::milli>(end_knn_linear - start_knn_linear).count() / iteraciones;
+
+    std::cout << "[KNN Lineal] (" << k << " vecinos) Tiempo prom: " << avg_knn_linear << " ms\n";
+    std::cout << "Top 1 encontrado: " << top1_linear << "\n";
+
+    // 5. --- PRUEBA DE KNN (R-TREE) ---
+    auto start_knn_rtree = std::chrono::high_resolution_clock::now();
+    std::string top1_rtree = "";
+    for(int i = 0; i < iteraciones; i++) {
+        auto res = rtree.knnQuery(queryX, queryY, k);
+        if(i == 0 && !res.empty()) top1_rtree = res[0].name;
+        dummy_sum += res.size();
+    }
+    auto end_knn_rtree = std::chrono::high_resolution_clock::now();
+    double avg_knn_rtree = std::chrono::duration<double, std::milli>(end_knn_rtree - start_knn_rtree).count() / iteraciones;
+
+    std::cout << "[KNN R-Tree] (" << k << " vecinos) Tiempo prom: " << avg_knn_rtree << " ms\n";
+    std::cout << "Top 1 encontrado: " << top1_rtree << "\n";
+    
+    // 6. --- REPORTE DE RENDIMIENTO ---
+    double speedup_range = avg_range_linear / (avg_range_rtree > 0 ? avg_range_rtree : 0.0001);
+    double speedup_knn = avg_knn_linear / (avg_knn_rtree > 0 ? avg_knn_rtree : 0.0001);
+    
+    std::cout << "\n>>> RENDIMIENTO GLOBAL (Promedio de " << iteraciones << " iteraciones) <<<\n";
+    std::cout << "* Consulta Rango: El R-Tree fue " << std::fixed << std::setprecision(2) << speedup_range << "x veces mas rapido.\n";
+    std::cout << "* Consulta KNN  : El R-Tree fue " << std::fixed << std::setprecision(2) << speedup_knn << "x veces mas rapido.\n";
+    
+    // Prevención de optimización del compilador (silencioso)
+    if (dummy_sum == 0) std::cout << " "; 
+}
 int main() {
     DatasetManager manager;
     std::string datasetPath = "src/gestor_datos/cities15000.txt"; 
 
-    std::vector<int> testSizes = {1000, 5000, 15000};
+    std::vector<int> testSizes = {1000, 5000, 15000, 100000};
 
     for (int size : testSizes) {
         if (manager.loadDataset(datasetPath, size)) {
